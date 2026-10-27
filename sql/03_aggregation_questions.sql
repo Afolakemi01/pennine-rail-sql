@@ -34,3 +34,21 @@ GROUP BY CASE
     END
 ORDER BY tickets DESC;
 -- Result: Of 60 tickets, 31 were rated Satisfied, 6 Neutral and 4 Dissatisfied; 18 had no survey response and 1 had an invalid rating (outside 1–5).
+
+-- A4. How many tickets in each travel class received a survey response?
+SELECT travel_class, COUNT(*) AS tickets, COUNT(customer_rating) AS responses, COUNT(*) - COUNT(customer_rating) AS no_response
+FROM tickets
+GROUP BY travel_class
+ORDER BY travel_class;
+-- Result: First class: 12 tickets, 6 survey responses, 6 no response (50% response rate). Standard: 48 tickets, 36 responses, 12 no response (75% response rate).
+
+-- A5. What is the average customer rating for each travel class?
+SELECT travel_class,
+    COUNT(customer_rating) AS ratings_used,
+    ROUND(AVG(customer_rating), 2) AS avg_rating
+FROM tickets
+WHERE customer_rating >= 1 AND customer_rating <= 5
+GROUP BY travel_class
+ORDER BY travel_class;
+-- Result: First Class tickets have an average customer rating of 3.50, based on 6 survey responses, while Standard Class tickets have an average rating of 3.91, based on 35 valid survey responses.
+
