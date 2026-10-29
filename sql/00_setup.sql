@@ -81,3 +81,38 @@ INSERT INTO tickets VALUES
 (58, '2026-10-11', '2026-10-12', 'Leeds'        , 'York'         , 'Off-Peak', 'Standard', 'Child', 'Station',   5.00, 'Completed',    5),
 (59, '2026-10-11', '2026-10-12', 'York'         , 'Leeds'        , 'Off-Peak', 'Standard', 'Adult', 'App'    ,  10.00, 'Completed',    4),
 (60, '2026-10-13', '2026-10-13', 'Leeds'        , 'Sheffield'    , 'Off-Peak', 'Standard', 'Adult', 'App'    ,  12.00, 'Completed',    5);
+
+-- Reference data: regions and stations.
+-- Loaded as received from the source system, without foreign keys;
+-- referential integrity is checked in 04_join_questions.sql.
+DROP TABLE IF EXISTS stations;
+DROP TABLE IF EXISTS regions;
+
+CREATE TABLE regions (
+    region_code      text PRIMARY KEY,
+    region_name      text NOT NULL,
+    regional_manager text NOT NULL
+);
+
+INSERT INTO regions (region_code, region_name, regional_manager) VALUES
+    ('GM', 'Greater Manchester', 'Priya Shah'),
+    ('WY', 'West Yorkshire',     'Tom Ellis'),
+    ('SY', 'South Yorkshire',    'Grace Okafor'),
+    ('NY', 'North Yorkshire',    'Daniel Hirst'),
+    ('HB', 'Humber',             'Sarah Lund');
+
+CREATE TABLE stations (
+    station_code     text PRIMARY KEY,
+    station_name     text NOT NULL UNIQUE,
+    region_code      text NOT NULL,
+    hub_station_code text
+);
+
+INSERT INTO stations (station_code, station_name, region_code, hub_station_code) VALUES
+    ('MAN', 'Manchester',   'GM',  NULL),
+    ('LDS', 'Leeds',        'WY',  NULL),
+    ('HUD', 'Huddersfield', 'WY',  'LDS'),
+    ('BDI', 'Bradford',     'WY',  'LDS'),
+    ('SHF', 'Sheffield',    'SY',  'MAN'),
+    ('YRK', 'York',         'NY',  'LDS'),
+    ('WKF', 'Wakefield',    'WYK', 'LDS');
