@@ -34,3 +34,11 @@ ON t.destination = s.station_name
 WHERE s.station_name IS NULL
 ORDER BY t.ticket_id;
 -- Result: No orphans: every ticket destination matches a station in the stations table.
+
+-- J5. For every station, show the name of its hub station.
+SELECT s.station_name, h.station_name AS hub_name
+FROM stations AS s
+LEFT JOIN stations AS h
+ON s.hub_station_code = h.station_code
+ORDER BY s.station_name;
+-- Result: Leeds is the main interchange, serving as hub for four stations (Bradford, Huddersfield, Wakefield, York); Sheffield's hub is Manchester; Leeds and Manchester are hubs themselves, so they have no hub.
