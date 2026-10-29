@@ -42,3 +42,14 @@ LEFT JOIN stations AS h
 ON s.hub_station_code = h.station_code
 ORDER BY s.station_name;
 -- Result: Leeds is the main interchange, serving as hub for four stations (Bradford, Huddersfield, Wakefield, York); Sheffield's hub is Manchester; Leeds and Manchester are hubs themselves, so they have no hub.
+
+-- J6. How many departures and how much ticket value does each region have?
+SELECT r.region_name, COUNT(t.ticket_id) AS departures, SUM(t.price_gbp) AS ticket_value_gbp
+FROM regions AS r
+JOIN stations AS s
+ON r.region_code = s.region_code
+JOIN tickets AS t
+ON s.station_name = t.origin
+GROUP BY r.region_name
+ORDER BY ticket_value_gbp DESC;
+-- Result: North Yorkshire has the highest ticket value (£265.00 from 16 departures), while West Yorkshire has the most departures (27). Departures total 60, matching the tickets table, so no tickets were lost in the chain. Humber does not appear because it has no stations.
