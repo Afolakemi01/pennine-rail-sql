@@ -1,5 +1,5 @@
 # Pennine Rail — SQL Analysis
-SQL analysis of ticket sales data for Pennine Rail, a fictional train operator in the north of England, using PostgreSQL to answer commercial questions about sales, prices routes and customer satisfaction.
+SQL analysis of ticket sales data for Pennine Rail, a fictional train operator in the north of England, using PostgreSQL to answer commercial questions about sales, prices, routes and customer satisfaction.
 
 ## Dataset
 One table, `tickets`, at the grain of one row per ticket sold. It covers 60 tickets for journeys between 1 and 14 October 2026. `customer_rating` holds a post-journey survey score from 1 to 5 and is NULL where no survey response was received.
@@ -17,11 +17,12 @@ The reference tables are loaded as received from the source system, without fore
 pennine-rail-sql/
 ├── README.md
 └── sql/
-    ├── 00_setup.sql                # creates and loads the tickets table
-    ├── 01_explore.sql              # data profiling checks
-    ├── 02_business_questions.sql   # commercial questions and answers
+    ├── 00_setup.sql          # creates and loads the tickets, stations and regions tables
+    ├── 01_explore.sql            # data profiling checks
+    ├── 02_business_questions.sql # commercial questions and answers
     ├── 03_aggregation_questions.sql # grouped totals, rating bands and averages
-    └── 04_join_questions.sql        #multi-table analysis and referential integrity checks
+    ├── 04_join_questions.sql     # multi-table analysis and referential integrity checks
+    └── 05_subquery_questions.sql # subqueries, CTEs, NULL-safe anti-joins and fan-out checks
 ```
 
 ## How to run
@@ -35,6 +36,7 @@ psql -d pennine_rail -P pager=off -f sql/01_explore.sql
 psql -d pennine_rail -P pager=off -f sql/02_business_questions.sql
 psql -d pennine_rail -P pager=off -f sql/03_aggregation_questions.sql
 psql -d pennine_rail -P pager=off -f sql/04_join_questions.sql
+psql -d pennine_rail -P pager=off -f sql/05_subquery_questions.sql
 ```
 
 `00_setup.sql` is safe to re-run: it drops and rebuilds the table.
@@ -59,9 +61,16 @@ psql -d pennine_rail -P pager=off -f sql/04_join_questions.sql
 - Standard class had a higher average customer rating of 3.91, based on 35 valid survey responses, compared with First class's average of 3.50, based on 6 valid responses. However, this comparison should be treated with caution because First class had a much lower response rate (50%) than Standard class (75%). The smaller number of First class responses means its average may be less representative of all First class passengers' experiences.
 
 **Joins**
-
 - Departures by station: Leeds and York lead with 16 departures each; Bradford and Wakefield have none. Counts total 60, reconciling with the tickets table.
 - Advance tickets: Huddersfield and Leeds lead with 6 Advance departures each.
 - Data quality: one orphan found. Wakefield's region code `WYK` does not exist in `regions` (likely a typo for `WY`). All ticket origins and destinations match a known station.
 - Network structure: Leeds is the hub for four stations; Sheffield's hub is Manchester.
 - By region: North Yorkshire has the highest ticket value (£265.00); West Yorkshire has the most departures (27). Humber has no stations.
+
+**Subqueries and CTEs**
+- Price: 29 of the 60 tickets sold for more than the network average of £12.61. The most expensive was £51.00 (York → Manchester).
+- Customer experience: departures from Huddersfield, Leeds and Manchester received at least one 1–2 star rating.
+- Ratings by station: Huddersfield (3.17 from 6 ratings) and Sheffield (3.57 from 7) are rated below the network average of 3.76.
+- Hub coverage: five stations (Bradford, Huddersfield, Sheffield, Wakefield, York) are not a hub for any station. A `NOT IN` version of this query returns no rows, because `hub_station_code` contains NULL; `NOT EXISTS` is used instead.
+- Departures per station: the 5 stations with departures average 12.0 each. Across all 7 stations the average would be 8.6, because Bradford and Wakefield have none, so the figure depends on which stations are included.
+- Departures and arrivals: joining tickets to stations twice multiplies the rows (Huddersfield's 11 departures × 9 arrivals = 99). Counting each side before joining gives the correct figures, which reconcile to 60 departures and 60 arrivals. Manchester receives the most arrivals (20).
