@@ -10,3 +10,13 @@ FROM tickets
 WHERE price_gbp > (SELECT AVG(price_gbp) FROM tickets)
 ORDER BY price_gbp DESC, ticket_id;
 -- Result: 29 tickets sold for more than the overall average ticket price of £12.61. Prices ranged from £13.50 to £51.00, with ticket_id 51 (York–Manchester) being the most expensive at £51.00.
+
+-- S2. Which stations have had at least one departing ticket rated between 1 and 2 stars?
+SELECT station_code, station_name
+FROM stations
+WHERE station_name IN
+    (SELECT origin
+    FROM tickets
+    WHERE customer_rating >= 1 AND customer_rating <= 2)
+ORDER BY station_name;
+-- Result: 3 stations have had at least one departing ticket rated 1–2 stars: Huddersfield, Leeds and Manchester.
