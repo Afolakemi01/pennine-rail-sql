@@ -20,3 +20,20 @@ WHERE station_name IN
     WHERE customer_rating >= 1 AND customer_rating <= 2)
 ORDER BY station_name;
 -- Result: 3 stations have had at least one departing ticket rated 1–2 stars: Huddersfield, Leeds and Manchester.
+
+-- S3a. Operations wants the stations that no station uses as its hub.
+SELECT station_code, station_name
+FROM stations
+WHERE station_code NOT IN (SELECT hub_station_code FROM stations)
+ORDER BY station_name;
+-- Result: 0 rows. NOT IN returns nothing because hub_station_code contains NULL (see S3b).
+
+-- S3b. NOT EXISTS:
+SELECT s.station_code, s.station_name
+FROM stations s
+WHERE NOT EXISTS
+    (SELECT 1
+    FROM stations h
+    WHERE s.station_code = h.hub_station_code)
+ORDER BY station_name;
+-- Result: Five stations (Bradford, Huddersfield, Sheffield, Wakefield and York) are not used as hub stations by any station. These are the stations with no stations depending on them as a hub.
