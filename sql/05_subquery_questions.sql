@@ -37,3 +37,51 @@ WHERE NOT EXISTS
     WHERE s.station_code = h.hub_station_code)
 ORDER BY station_name;
 -- Result: Five stations (Bradford, Huddersfield, Sheffield, Wakefield and York) are not used as hub stations by any station. These are the stations with no stations depending on them as a hub.
+
+-- S4. On average, how many tickets does one station sell as departures, and how many stations went into that average?
+SELECT
+    COUNT(*) AS stations_counted,
+    ROUND(AVG(departures), 1) AS avg_departures_per_station
+FROM (
+    SELECT
+        origin,
+        COUNT(*) AS departures
+    FROM tickets
+    GROUP BY origin
+) AS origin_summary;
+-- Result: 5 origin stations averaged 12.0 departures each (5 × 12.0 = 60 tickets).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+WITH stations_counted AS(
+    SELECT s.station_name, COUNT(t.ticket_id) AS per_station
+    FROM stations s
+    JOIN tickets t
+    ON s.station_name = t.origin
+    GROUP BY s.station_name
+)
+
+SELECT s.station_name, AVG(sc.per_station) AS per_station
+FROM stations s
+JOIN stations_counted sc
+ON s.station_name = sc.station_name
+GROUP BY s.station_name;
