@@ -68,34 +68,24 @@ WHERE avg_rating < (
 ORDER BY avg_rating;
 -- Result: 2 origin stations are rated below the network average of 3.76: Huddersfield (3.17 from 6 ratings) and Sheffield (3.57 from 7 ratings).
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-WITH stations_counted AS(
-    SELECT s.station_name, COUNT(t.ticket_id) AS per_station
-    FROM stations s
-    JOIN tickets t
-    ON s.station_name = t.origin
-    GROUP BY s.station_name
-)
-
-SELECT s.station_name, AVG(sc.per_station) AS per_station
+-- S6. For each station, how many tickets departed from it and how many arrived at it?
+WITH station_departures AS (
+    SELECT origin, COUNT(*) AS dep_count
+    FROM tickets
+    GROUP BY origin
+    ),
+station_arrivals AS (
+    SELECT destination, COUNT(*) AS arr_count
+    FROM tickets
+    GROUP BY destination
+    )
+SELECT s.station_name,
+    COALESCE(sd.dep_count, 0) AS departures,
+    COALESCE(sa.arr_count, 0) AS arrivals
 FROM stations s
-JOIN stations_counted sc
-ON s.station_name = sc.station_name
-GROUP BY s.station_name;
+LEFT JOIN station_departures sd
+ON s.station_name = sd.origin
+LEFT JOIN station_arrivals sa
+ON s.station_name = sa.destination
+ORDER BY s.station_name;
+-- Result: Leeds and York have the most departures (16 each); Manchester has the most arrivals (20). Bradford and Wakefield have no tickets either way. Totals reconcile to 60 departures and 60 arrivals.
