@@ -51,8 +51,22 @@ FROM (
 ) AS origin_summary;
 -- Result: 5 origin stations averaged 12.0 departures each (5 × 12.0 = 60 tickets).
 
-
-
+-- S5. Which departure stations have a worse average customer rating than the network as a whole?
+WITH station_ratings AS (
+    SELECT origin,
+        COUNT(customer_rating) AS rated_tickets,
+        AVG(customer_rating) AS avg_rating
+    FROM tickets
+    GROUP BY origin
+)
+SELECT origin, rated_tickets, ROUND(avg_rating, 2) AS avg_rating,
+    (SELECT ROUND(AVG(customer_rating), 2) FROM tickets) AS network_avg_rating
+FROM station_ratings
+WHERE avg_rating < (
+    SELECT AVG(customer_rating)
+    FROM tickets)
+ORDER BY avg_rating;
+-- Result: 2 origin stations are rated below the network average of 3.76: Huddersfield (3.17 from 6 ratings) and Sheffield (3.57 from 7 ratings).
 
 
 
