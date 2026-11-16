@@ -41,3 +41,23 @@ SELECT travel_date,
 FROM daily_revenue
 ORDER BY travel_date ASC;
 -- Result: Daily completed revenue ranged from £6.00 to £93.50 (1–14 October 2026); the 3-day moving average peaked at £71.33 on 11 October. The final days are low because the data only covers tickets bought up to 13 October.
+
+-- W4: What are the two highest completed-ticket prices from each origin, and which tickets were sold at them?
+WITH ranked_prices AS (
+    SELECT origin,
+        ticket_id,
+        price_gbp,
+        -- DENSE_RANK: tied tickets share one price point, so a tie must not use up the second slot (RANK would skip to 3 and drop Leeds' £17.00).
+        DENSE_RANK() OVER(PARTITION BY origin ORDER BY price_gbp DESC) AS price_rank
+    FROM tickets
+    WHERE ticket_status = 'Completed'
+    )
+SELECT origin,
+    ticket_id,
+    price_gbp,
+    price_rank
+FROM ranked_prices
+WHERE price_rank <= 2
+ORDER BY origin, price_gbp DESC, ticket_id;
+-- Result: 11 tickets across 5 origins; Manchester has the highest top price (£33.00), and Leeds has two tickets tied at £22.00 before its second price point of £17.00.
+
