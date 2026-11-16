@@ -23,7 +23,8 @@ pennine-rail-sql/
     ├── 03_aggregation_questions.sql # grouped totals, rating bands and averages
     ├── 04_join_questions.sql     # multi-table analysis and referential integrity checks
     ├── 05_subquery_questions.sql # subqueries, CTEs, NULL-safe anti-joins and fan-out checks
-    └── 06_dates_strings_sets.sql # date and string reporting, set operations and recursive CTEs
+    ├── 06_dates_strings_sets.sql # date and string reporting, set operations and recursive CTEs
+    └── 07_window_functions.sql  # window-function analysis: revenue share, running totals, moving averages, ranking, latest record per station, month-on-month change and sales-gap detection
 ```
 
 ## How to run
@@ -84,3 +85,12 @@ psql -d pennine_rail -P pager=off -f sql/06_dates_strings_sets.sql
 - Route balance: all 16 routes sold were also sold in the reverse direction, so there are no one-way routes. This was confirmed with an INTERSECT count, because an empty result alone does not prove the query is correct.
 - Network depth: Leeds and Manchester are the only top-level hubs, and every other station is exactly one level below its hub.
 - York gaps: York had 16 departures, and no departures on 4 of the 14 days (4, 6, 8 and 14 October). These gaps were found by joining a generated calendar to the tickets.
+
+**Window functions**
+- Channel mix by ticket type: Advance revenue comes mainly from the Website (63.1%), Anytime from the App (46.2%) and Off-Peak from station sales (45.7%).
+- Station takings: completed station sales built up to £163.50 across 12 tickets between 29 September and 11 October 2026.
+- Daily trend: daily completed revenue ranged from £6.00 to £93.50; the 3-day moving average peaked at £71.33 on 11 October. Travel dates after 13 October are under-represented because the data covers purchases up to that date.
+- Top price points: Manchester has the highest top price (£33.00); Leeds has two tickets tied at £22.00, so price points are ranked with `DENSE_RANK` to keep its second price point (£17.00).
+- Latest sale per station: four stations' latest tickets were completed; Huddersfield's latest (#55) was refunded. Leeds made the most recent sale, on 13 October 2026.
+- Month-on-month: completed revenue rose from £220.00 (September purchases) to £402.50 (October purchases), an increase of £182.50.
+- Sales gaps: three one-week gaps were found: Leeds and York (week beginning 14 September) and Manchester (week beginning 21 September). Gaps before a station's first sale or after its last are not detectable with this method.
