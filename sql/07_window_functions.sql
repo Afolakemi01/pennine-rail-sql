@@ -84,3 +84,21 @@ FROM origin_recent
 WHERE recency_rank = 1
 ORDER BY origin;
 -- Result: The results identify the most recently sold ticket from each of the five origin stations. Four latest tickets were completed, while Huddersfield's latest ticket (ID 55, sold on 10 October 2026) was refunded. Leeds had the most recent sale overall, on 13 October 2026.
+
+-- W6: How did completed revenue change from one purchase month to the next?
+WITH monthly_revenue AS(
+    SELECT DATE_TRUNC('month', purchase_date)::DATE AS purchase_month,
+        COUNT(*) AS tickets,
+        SUM(price_gbp) AS revenue_gbp
+    FROM tickets
+    WHERE ticket_status = 'Completed'
+    GROUP BY DATE_TRUNC('month', purchase_date)::DATE
+    )
+SELECT purchase_month,
+    tickets,
+    revenue_gbp,
+    LAG(revenue_gbp) OVER(ORDER BY purchase_month) AS prev_month_revenue_gbp,
+    revenue_gbp - LAG(revenue_gbp) OVER(ORDER BY purchase_month) AS change_gbp
+FROM monthly_revenue
+ORDER BY purchase_month;
+-- Result: Completed-ticket revenue increased from £220.00 in September 2026 to £402.50 in October 2026, representing a month-on-month increase of £182.50. September has no previous-month revenue or change because it is the first month in the results.
