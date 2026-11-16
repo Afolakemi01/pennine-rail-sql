@@ -61,3 +61,26 @@ WHERE price_rank <= 2
 ORDER BY origin, price_gbp DESC, ticket_id;
 -- Result: 11 tickets across 5 origins; Manchester has the highest top price (£33.00), and Leeds has two tickets tied at £22.00 before its second price point of £17.00.
 
+-- W5: What was the most recent ticket sold from each origin station?
+-- One window per origin; tickets ordered by latest purchase date and highest ticket ID; returns one row per origin (5 rows).
+WITH origin_recent AS (
+    SELECT origin,
+        ticket_id,
+        destination,
+        ticket_status,
+        purchase_date,
+        -- ROW_NUMBER(): assigns each ticket a unique position, using the higher ticket ID to break purchase-date ties.
+        ROW_NUMBER() OVER(
+            PARTITION BY origin
+            ORDER BY purchase_date DESC, ticket_id DESC) AS recency_rank
+    FROM tickets
+)
+SELECT origin,
+    ticket_id,
+    purchase_date,
+    destination,
+    ticket_status
+FROM origin_recent
+WHERE recency_rank = 1
+ORDER BY origin;
+-- Result: The results identify the most recently sold ticket from each of the five origin stations. Four latest tickets were completed, while Huddersfield's latest ticket (ID 55, sold on 10 October 2026) was refunded. Leeds had the most recent sale overall, on 13 October 2026.
