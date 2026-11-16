@@ -69,7 +69,7 @@ WITH origin_recent AS (
         destination,
         ticket_status,
         purchase_date,
-        -- ROW_NUMBER(): assigns each ticket a unique position, using the higher ticket ID to break purchase-date ties.
+        -- ROW_NUMBER: exactly one latest ticket per origin is wanted; unlike RANK or DENSE_RANK, it never gives two rows the same number.
         ROW_NUMBER() OVER(
             PARTITION BY origin
             ORDER BY purchase_date DESC, ticket_id DESC) AS recency_rank
@@ -102,3 +102,36 @@ SELECT purchase_month,
 FROM monthly_revenue
 ORDER BY purchase_month;
 -- Result: Completed-ticket revenue increased from £220.00 in September 2026 to £402.50 in October 2026, representing a month-on-month increase of £182.50. September has no previous-month revenue or change because it is the first month in the results.
+
+-- W7: Which origin stations had a week with no ticket sales between weeks with sales?
+-- One window per origin; counts all tickets sold in each week; each output row represents a gap between weeks with sales.
+WITH weekly_sales AS(
+    SELECT origin,
+        DATE_TRUNC('week', purchase_date)::DATE AS sales_week,
+        COUNT(ticket_id) AS tickets_sold
+    FROM tickets
+    GROUP BY origin, DATE_TRUNC('week', purchase_date)::DATE
+),
+prev_weekly_sales AS (
+    SELECT origin,
+        sales_week,
+        tickets_sold,
+        LAG(sales_week) OVER(PARTITION BY origin ORDER BY sales_week) AS prev_sales_week
+    FROM weekly_sales),
+week_checks AS(
+    SELECT origin,
+        sales_week,
+        prev_sales_week,
+        CASE
+            WHEN prev_sales_week IS NULL THEN 'first week'
+            WHEN prev_sales_week = sales_week - INTERVAL '1 week' THEN 'consecutive'
+            ELSE 'gap'
+        END AS weekly_check
+    FROM  prev_weekly_sales)
+SELECT origin,
+    prev_sales_week,
+    sales_week
+FROM week_checks
+WHERE weekly_check = 'gap'
+ORDER BY origin, sales_week;
+-- Result: Three one-week gaps: Leeds and York had no ticket sales in the week beginning 14 September 2026, and Manchester had none in the week beginning 21 September 2026.
