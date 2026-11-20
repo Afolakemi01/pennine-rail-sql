@@ -66,7 +66,7 @@ WHERE avg_rating < (
     SELECT AVG(customer_rating)
     FROM tickets)
 ORDER BY avg_rating;
--- Result: 2 origin stations are rated below the network average of 3.76: Huddersfield (3.17 from 6 ratings) and Sheffield (3.57 from 7 ratings).
+-- Result: 2 origin stations are rated below the network average of 3.85: Huddersfield (3.17 from 6 ratings) and York (3.82 from 11 ratings).
 
 -- S6. For each station, how many tickets departed from it and how many arrived at it?
 WITH station_departures AS (

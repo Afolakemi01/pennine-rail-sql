@@ -33,7 +33,7 @@ FROM stations s
 LEFT JOIN regions r
 ON s.region_code = r.region_code
 ORDER BY s.station_name;
--- Result: 7 lines. Wakefield (WKF) shows Region unknown: its region code WYK has no match in regions.
+-- Result: 7 lines, each station with its region. In the raw load, Wakefield (WKF) showed Region unknown because its region code WYK had no match; corrected in 08_constraints.sql.
 
 -- D4: For each route sold, did anyone also buy the return direction?
 SELECT origin,
