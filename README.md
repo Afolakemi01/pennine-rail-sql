@@ -9,7 +9,7 @@ Two reference tables support multi-table analysis:
 - `regions`: one row per operating region (code, name, regional manager).
 - `stations`: one row per station, with its region and its hub station. Tickets link to stations by station name.
 
-The reference tables are loaded as received from the source system, without foreign keys, so referential integrity is verified by query (see `04_join_questions.sql`).
+The reference tables are loaded as received from the source system. Foreign keys and CHECK constraints are added afterwards by `08_constraints.sql` (see Data integrity).
 
 ## Repository structure
 
@@ -24,7 +24,8 @@ pennine-rail-sql/
     ├── 04_join_questions.sql     # multi-table analysis and referential integrity checks
     ├── 05_subquery_questions.sql # subqueries, CTEs, NULL-safe anti-joins and fan-out checks
     ├── 06_dates_strings_sets.sql # date and string reporting, set operations and recursive CTEs
-    └── 07_window_functions.sql  # window-function analysis: revenue share, running totals, moving averages, ranking, latest record per station, month-on-month change and sales-gap detection
+    ├── 07_window_functions.sql  # window-function analysis: revenue share, running totals, moving averages, ranking, latest record per station, month-on-month change and sales-gap detection
+    └── 08_constraints.sql       # orphan checks, data corrections, foreign keys and CHECK constraints
 ```
 
 ## How to run
@@ -34,15 +35,52 @@ Requires PostgreSQL. From the repository root:
 ```bash
 createdb pennine_rail
 psql -d pennine_rail -f sql/00_setup.sql
+psql -d pennine_rail -P pager=off -f sql/08_constraints.sql
 psql -d pennine_rail -P pager=off -f sql/01_explore.sql
 psql -d pennine_rail -P pager=off -f sql/02_business_questions.sql
 psql -d pennine_rail -P pager=off -f sql/03_aggregation_questions.sql
 psql -d pennine_rail -P pager=off -f sql/04_join_questions.sql
 psql -d pennine_rail -P pager=off -f sql/05_subquery_questions.sql
 psql -d pennine_rail -P pager=off -f sql/06_dates_strings_sets.sql
+psql -d pennine_rail -P pager=off -f sql/07_window_functions.sql
 ```
 
-`00_setup.sql` is safe to re-run: it drops and rebuilds the tables.
+`00_setup.sql` drops and rebuilds the tables from the raw load, which removes all constraints and restores two uncorrected rows. Always run `08_constraints.sql` immediately after it.
+
+## Data integrity
+
+`sql/08_constraints.sql` adds the relationships and business rules the original load did not enforce. Every rule was checked against the existing data before it was added.
+
+**Primary keys** (created in `00_setup.sql`): `tickets.ticket_id`, `stations.station_code`, `regions.region_code`. `stations.station_name` is also unique.
+
+**Foreign keys**
+
+| Constraint | Rule | ON DELETE | Reason |
+|---|---|---|---|
+| `fk_tickets_origin` | `tickets.origin` → `stations.station_name` | RESTRICT | Tickets are sales records; a station with ticket history cannot be removed |
+| `fk_tickets_destination` | `tickets.destination` → `stations.station_name` | RESTRICT | As above |
+| `fk_stations_region_code` | `stations.region_code` → `regions.region_code` | RESTRICT | Deleting a region must not silently remove its stations |
+| `fk_stations_hub_code` | `stations.hub_station_code` → `stations.station_code` | SET NULL | NULL already means "no hub"; if a hub is removed, its stations become hub-less rather than invalid |
+
+**CHECK constraints**
+
+| Constraint | Rule | Reason |
+|---|---|---|
+| `chk_tickets_price` | `price_gbp >= 0` | Free tickets (e.g. staff travel) are valid; negative prices are not |
+| `chk_tickets_customer_rating` | `customer_rating BETWEEN 1 AND 5` | Matches the 1–5 survey scale; NULL (no response) is still allowed |
+| `chk_tickets_purchase_before_travel` | `travel_date >= purchase_date` | Same-day purchases are valid; travel before purchase is not |
+| `chk_tickets_status` | `ticket_status` is `Completed` or `Refunded` | The only statuses in use; a new status requires a deliberate change to this rule |
+
+**Data corrections**
+
+Two rows broke the new rules and were corrected before the constraints were added:
+
+- **Wakefield (`WKF`)** had region code `WYK`, which does not exist in `regions`. Corrected to `WY` (West Yorkshire): every other region code has two letters, and Wakefield's hub, Leeds, is also in West Yorkshire.
+- **Ticket 13** had a customer rating of 0, outside the 1–5 scale. Set to NULL (no valid response).
+
+Correcting the rating raised the network average rating from 3.76 to 3.85 and changed which stations fall below it: York replaced Sheffield. The findings below reflect the corrected data.
+
+**Design note:** `tickets` references stations by name rather than code because that is how the source data arrives. Station codes would be a more stable key, since names can change; moving `tickets` to `station_code` is a future improvement.
 
 ## Findings
 
@@ -60,20 +98,20 @@ psql -d pennine_rail -P pager=off -f sql/06_dates_strings_sets.sql
 **Aggregation analysis**
 - Website generated the most revenue from completed tickets (£237.50 from 20 tickets), £16.00 ahead of App (£221.50, also 20 tickets); Station was lowest (£163.50 from 12 tickets).
 - 11 of the 16 routes sold at least 3 tickets. York → Leeds and York → Manchester were the busiest (7 tickets each), followed by Leeds ↔ Huddersfield (6 each way).
-- Of the 41 valid survey ratings, 31 (76%) were Satisfied (4–5). 18 tickets had no response, including all 8 refunded tickets, and one rating of 0 was flagged as invalid and excluded from averages.
+- Of the 41 valid survey ratings, 31 (76%) were Satisfied (4–5). 19 tickets had no valid response, including all 8 refunded tickets.
 - Standard class had a higher average customer rating of 3.91, based on 35 valid survey responses, compared with First class's average of 3.50, based on 6 valid responses. However, this comparison should be treated with caution because First class had a much lower response rate (50%) than Standard class (75%). The smaller number of First class responses means its average may be less representative of all First class passengers' experiences.
 
 **Joins**
 - Departures by station: Leeds and York lead with 16 departures each; Bradford and Wakefield have none. Counts total 60, reconciling with the tickets table.
 - Advance tickets: Huddersfield and Leeds lead with 6 Advance departures each.
-- Data quality: one orphan found. Wakefield's region code `WYK` does not exist in `regions` (likely a typo for `WY`). All ticket origins and destinations match a known station.
+- Data quality: the integrity check found one orphan in the raw load: Wakefield's region code `WYK` had no match in `regions`. It was corrected to `WY` (see Data integrity), and the check now returns no orphans. All ticket origins and destinations match a known station.
 - Network structure: Leeds is the hub for four stations; Sheffield's hub is Manchester.
 - By region: North Yorkshire has the highest ticket value (£265.00); West Yorkshire has the most departures (27). Humber has no stations.
 
 **Subqueries and CTEs**
 - Price: 29 of the 60 tickets sold for more than the network average of £12.61. The most expensive was £51.00 (York → Manchester).
 - Customer experience: departures from Huddersfield, Leeds and Manchester received at least one 1–2 star rating.
-- Ratings by station: Huddersfield (3.17 from 6 ratings) and Sheffield (3.57 from 7) are rated below the network average of 3.76.
+- Ratings by station: Huddersfield (3.17 from 6 ratings) and York (3.82 from 11) are rated below the network average of 3.85.
 - Hub coverage: five stations (Bradford, Huddersfield, Sheffield, Wakefield, York) are not a hub for any station. A `NOT IN` version of this query returns no rows, because `hub_station_code` contains NULL; `NOT EXISTS` is used instead.
 - Departures per station: the 5 stations with departures average 12.0 each. Across all 7 stations the average would be 8.6, because Bradford and Wakefield have none, so the figure depends on which stations are included.
 - Departures and arrivals: joining tickets to stations twice multiplies the rows (Huddersfield's 11 departures × 9 arrivals = 99). Counting each side before joining gives the correct figures, which reconcile to 60 departures and 60 arrivals. Manchester receives the most arrivals (20).
@@ -81,7 +119,7 @@ psql -d pennine_rail -P pager=off -f sql/06_dates_strings_sets.sql
 **Dates, strings and set operations**
 - Booking lead time: Advance tickets are bought 18.1 days ahead on average (up to 27 days); Off-Peak and Anytime tickets are bought within 3 days.
 - Daily demand: every day from 1 to 14 October had at least one ticket. The busiest day was Saturday 3 October (8 tickets).
-- Station directory: all 7 stations are listed. Wakefield (WKF) is labelled "Region unknown" because its region code `WYK` has no match, rather than being dropped from the list.
+- Station directory: all 7 stations are listed with their region. A station with an unmatched region code is labelled "Region unknown" rather than dropped from the list.
 - Route balance: all 16 routes sold were also sold in the reverse direction, so there are no one-way routes. This was confirmed with an INTERSECT count, because an empty result alone does not prove the query is correct.
 - Network depth: Leeds and Manchester are the only top-level hubs, and every other station is exactly one level below its hub.
 - York gaps: York had 16 departures, and no departures on 4 of the 14 days (4, 6, 8 and 14 October). These gaps were found by joining a generated calendar to the tickets.

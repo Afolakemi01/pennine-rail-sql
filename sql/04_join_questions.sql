@@ -24,7 +24,7 @@ LEFT JOIN regions AS r
 ON s.region_code = r.region_code
 WHERE r.region_code IS NULL
 ORDER BY s.station_code;
--- Result: One orphan: Wakefield (WKF) has region_code 'WYK', which does not exist in regions; it is most likely a typo for 'WY' (West Yorkshire) and should be corrected at source.
+-- Result: No orphans. In the raw load, Wakefield (WKF) had region_code 'WYK', which does not exist in regions; it is corrected to 'WY' (West Yorkshire) in 08_constraints.sql.
 
 -- J4. Do any tickets have a destination that isn’t a known station?
 SELECT t.ticket_id, t.destination

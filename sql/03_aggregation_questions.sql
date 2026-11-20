@@ -33,7 +33,7 @@ GROUP BY CASE
     ELSE 'Invalid'
     END
 ORDER BY tickets DESC;
--- Result: Of 60 tickets, 31 were rated Satisfied, 6 Neutral and 4 Dissatisfied; 18 had no survey response and 1 had an invalid rating (outside 1–5).
+-- Result: Of 60 tickets, 31 were rated Satisfied, 6 Neutral and 4 Dissatisfied; 19 had no valid survey response.
 
 -- A4. How many tickets in each travel class received a survey response?
 SELECT travel_class, COUNT(*) AS tickets, COUNT(customer_rating) AS responses, COUNT(*) - COUNT(customer_rating) AS no_response
