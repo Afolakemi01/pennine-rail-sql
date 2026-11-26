@@ -25,7 +25,8 @@ pennine-rail-sql/
     ├── 05_subquery_questions.sql # subqueries, CTEs, NULL-safe anti-joins and fan-out checks
     ├── 06_dates_strings_sets.sql # date and string reporting, set operations and recursive CTEs
     ├── 07_window_functions.sql  # window-function analysis: revenue share, running totals, moving averages, ranking, latest record per station, month-on-month change and sales-gap detection
-    └── 08_constraints.sql       # orphan checks, data corrections, foreign keys and CHECK constraints
+    ├── 08_constraints.sql      # orphan checks, data corrections, foreign keys and CHECK constraints
+    └── 09_normalisation.sql     # functional dependencies, normal-form review and fare-dependency check
 ```
 
 ## How to run
@@ -43,6 +44,7 @@ psql -d pennine_rail -P pager=off -f sql/04_join_questions.sql
 psql -d pennine_rail -P pager=off -f sql/05_subquery_questions.sql
 psql -d pennine_rail -P pager=off -f sql/06_dates_strings_sets.sql
 psql -d pennine_rail -P pager=off -f sql/07_window_functions.sql
+psql -d pennine_rail -P pager=off -f sql/09_normalisation.sql
 ```
 
 `00_setup.sql` drops and rebuilds the tables from the raw load, which removes all constraints and restores two uncorrected rows. Always run `08_constraints.sql` immediately after it.
@@ -80,7 +82,22 @@ Two rows broke the new rules and were corrected before the constraints were adde
 
 Correcting the rating raised the network average rating from 3.76 to 3.85 and changed which stations fall below it: York replaced Sheffield. The findings below reflect the corrected data.
 
-**Design note:** `tickets` references stations by name rather than code because that is how the source data arrives. Station codes would be a more stable key, since names can change; moving `tickets` to `station_code` is a future improvement.
+## Data model and normalisation
+
+`sql/09_normalisation.sql` documents the functional dependencies behind the schema and reviews it against the first three normal forms.
+
+**Functional dependencies**
+- `tickets`: `ticket_id -> purchase_date, travel_date, origin, destination, ticket_type, travel_class, passenger_type, sales_channel, price_gbp, ticket_status, customer_rating`
+- `stations`: `station_code -> station_name, region_code, hub_station_code` and `station_name -> station_code, region_code, hub_station_code` (two candidate keys; `station_code` is the primary key and `station_name` is `UNIQUE`)
+- `regions`: `region_code -> region_name, regional_manager`
+
+**Verdict:** all three tables are in 3NF. Every column holds a single value (1NF), and every determinant is a candidate key, so no column depends on part of a key (2NF) or on a non-key column (3NF).
+
+**Design decisions**
+- **Price is stored on each ticket.** A check for `(origin, destination, ticket_type, travel_class, passenger_type) -> price_gbp` found no conflicting prices, but only 11 of 47 combinations occur more than once. Fares change over time, so `price_gbp` records the price paid at purchase. Moving it to a fares table would rewrite historical sales whenever a fare changed.
+- **Region is not copied onto tickets.** Regional reporting joins `tickets -> stations -> regions`. Storing the region on each ticket would save one join but create an update anomaly if a station changed region.
+- **Fixed value sets use CHECK constraints, not lookup tables.** Ticket type, class, passenger type, channel and status have no attributes of their own, so a lookup table would add joins without removing any dependency.
+- **Known trade-off:** `tickets` references stations by name, a descriptive attribute that can change. Renaming a station is blocked by the foreign keys (default `ON UPDATE NO ACTION`) while tickets still reference the old name. Migrating `tickets` to `station_code`, with a view that keeps the current column names for existing queries, is a planned improvement.
 
 ## Findings
 
